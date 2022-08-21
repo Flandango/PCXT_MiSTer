@@ -174,7 +174,7 @@ module emu
 ///////// Default values for ports not used in this core /////////
 
 assign ADC_BUS  = 'Z;
-assign USER_OUT = '1;
+//assign USER_OUT = '1;
 //assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 //assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 //assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
@@ -242,12 +242,10 @@ localparam CONF_STR = {
 	"P3-;",
 	"P3OB,Lo-tech 2MB EMS, Enabled, Disabled;",
 	"P3OCD,EMS Frame,A000,C000,D000;",
-	"P3-;",
 	"-;",
-//	"F1,ROM,Load BIOS  (F000);",	
-//	"F2,ROM,Load XTIDE (EC00);",	
-//	"-;",
-//	"T0,Reset;",
+	"F1,ROM,Load BIOS  (F000);",	
+	"F2,ROM,Load XTIDE (EC00);",	
+	"-;",
 	"R0,Reset and close OSD;",
 	"V,v",`BUILD_DATE 
 };
@@ -670,14 +668,21 @@ end
 		  .ioctl_wr                           (ioctl_wr),
 		  .ioctl_addr                         (ioctl_addr),
 		  .ioctl_data                         (ioctl_data),		  
-		  .clk_uart                          (clk_uart),
-	     .uart_rx                           (uart_rx),
-	     .uart_tx                           (uart_tx),
-	     .uart_cts_n                        (uart_cts),
-	     .uart_dcd_n                        (uart_dcd),
-	     .uart_dsr_n                        (uart_dsr),
-	     .uart_rts_n                        (uart_rts),
-	     .uart_dtr_n                        (uart_dtr),
+		  .clk_uart                           (clk_uart),
+	     .uart_rx                            (uart_rx),
+	     .uart_tx                            (uart_tx),
+	     .uart_cts_n                         (uart_cts),
+	     .uart_dcd_n                         (uart_dcd),
+	     .uart_dsr_n                         (uart_dsr),
+	     .uart_rts_n                         (uart_rts),
+	     .uart_dtr_n                         (uart_dtr),
+	     .uart2_rx                           (uart2_rx),
+	     .uart2_tx                           (uart2_tx),
+	     .uart2_cts_n                        (uart2_cts),
+	     .uart2_dcd_n                        (uart2_dcd),
+	     .uart2_dsr_n                        (uart2_dsr),
+	     .uart2_rts_n                        (uart2_rts),
+	     .uart2_dtr_n                        (uart2_dtr),
 		  .enable_sdram                       (1'b1),
 		  .sdram_clock                        (SDRAM_CLK),
 		  .sdram_address                      (SDRAM_A),
@@ -731,21 +736,6 @@ end
 	
 	/// UART
 
-
-	//assign USER_OUT = {1'b1, 1'b1, uart_dtr, 1'b1, uart_rts, uart_tx, 1'b1};
-	
-	//
-	// Pin | USB Name |   |Signal
-	// ----+----------+---+-------------
-	// 0   | D+       | I |RX
-	// 1   | D-       | O |TX
-	// 2   | TX-      | O |RTS
-	// 3   | GND_d    | I |CTS
-	// 4   | RX+      | O |DTR
-	// 5   | RX-      | I |DSR
-	// 6   | TX+      | I |DCD
-	//
-
 	wire uart_tx, uart_rts, uart_dtr;
 	
 	assign UART_TXD = uart_tx;
@@ -763,6 +753,29 @@ end
 		else
 			cpu_address <= cpu_address;
 	end	
+	/// UART2
+
+	assign USER_OUT = {1'b1, 1'b1, uart2_dtr, 1'b1, uart2_rts, uart2_tx, 1'b1};
+
+	//
+	// Pin | USB Name |   |Signal
+	// ----+----------+---+-------------
+	// 0   | D+       | I |RX
+	// 1   | D-       | O |TX
+	// 2   | TX-      | O |RTS
+	// 3   | GND_d    | I |CTS
+	// 4   | RX+      | O |DTR
+	// 5   | RX-      | I |DSR
+	// 6   | TX+      | I |DCD
+	//
+
+	wire uart2_tx, uart2_rts, uart2_dtr;
+
+	wire uart2_rx  = USER_IN[0];
+	wire uart2_cts = USER_IN[3];
+	wire uart2_dsr = USER_IN[5];
+	wire uart2_dcd = USER_IN[6];
+
 	
 	/// VIDEO
 
