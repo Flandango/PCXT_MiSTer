@@ -218,16 +218,17 @@ localparam CONF_STR = {
 	"O3,Model,IBM PCXT,Tandy 1000;",
 	"OHI,CPU Speed,4.77MHz,7.16MHz,14.318MHz;",
 	"-;",
-	"O7,Splash Screen,Yes,No;",
+    "O7,Splash Screen,Yes,No;",
 	"-;",
 	"P1,FDD & HDD;",
 	"P1-;",
-	"P1S1,IMGIMA,FDD Image:;",
-	"P1S0,IMG,HDD Image:;",
+	"P1S0,IMGIMAVFD,Floppy A:;",
+	"P1S1,IMGIMAVFD,Floppy B:;",
+	"P1O12,Write Protect,None,A:,B:,A: & B:;",
 	"P1-;",
-	"P1OJK,Write Protect,None,FDD,HDD,FDD & HDD;",
+	"P1S2,IMG,HDD Image:;",
 	"P1-;",
-	"P1OLM,Speed,115200,230400,460800,921600;",
+	"P1OLM,HDD Speed,115200,230400,460800,921600;",
 	"P1-;",
 	"P2,Audio & Video;",
 	"P2-;",
@@ -262,7 +263,7 @@ localparam CONF_STR = {
 
 wire forced_scandoubler;
 wire  [1:0] buttons;
-wire [31:0] status;
+wire [63:0] status;
 //wire [10:0] ps2_key;
 
 //VHD	
@@ -293,7 +294,8 @@ wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
-wire  [7:0] ioctl_data;
+wire [15:0] ioctl_data;
+reg         ioctl_wait = 1'b0;
 
 wire        clk_uart;
 
@@ -302,12 +304,11 @@ wire        adlibhide = status[10];
 
 wire [31:0] joy0, joy1;
 wire [15:0] joya0, joya1;
-
-hps_io #(.CONF_STR(CONF_STR), .PS2DIV(2000), .PS2WE(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .PS2DIV(2000), .PS2WE(1), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_chipset),
 	.HPS_BUS(HPS_BUS),
-	.EXT_BUS(),
+	.EXT_BUS(EXT_BUS),
 	.gamma_bus(gamma_bus),
 
 	.forced_scandoubler(forced_scandoubler),
@@ -348,7 +349,33 @@ hps_io #(.CONF_STR(CONF_STR), .PS2DIV(2000), .PS2WE(1)) hps_io
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
-	.ioctl_dout(ioctl_data)	
+	.ioctl_dout(ioctl_data),
+	.ioctl_wait(ioctl_wait)
+);
+
+
+wire [15:0] mgmt_din;
+wire [15:0] mgmt_dout;
+wire [15:0] mgmt_addr;
+wire        mgmt_rd;
+wire        mgmt_wr;
+wire  [7:0] mgmt_req;
+assign mgmt_req[5:0] = 6'b000000;
+
+wire [35:0] EXT_BUS;
+hps_ext hps_ext
+(
+	.clk_sys(clk_chipset),
+	.EXT_BUS(EXT_BUS),
+
+	.ext_din(mgmt_din),
+	.ext_dout(mgmt_dout),
+	.ext_addr(mgmt_addr),
+	.ext_rd(mgmt_rd),
+	.ext_wr(mgmt_wr),
+
+	.ext_req(mgmt_req),
+	.ext_hotswap(2'b00)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -525,6 +552,69 @@ end
 
 //////////////////////////////////////////////////////////////////
 
+logic   [3:0]   romwctl_state = 4'h0;
+logic           romwctl_wr = 1'b0;
+logic   [24:0]  romwctl_addr = 'h0;
+logic   [15:0]  romwctl_data = 'h0;
+logic           romwctl_download = 1'b0;
+logic   [7:0]   romwctl_index = 'h0;
+
+always @(negedge clk_chipset) begin
+	casez (romwctl_state)
+		4'h0: begin
+			if (~ioctl_wr) begin
+				romwctl_state <= 4'h0;
+				romwctl_wr <= 1'h0;
+				ioctl_wait <= 1'b0;
+			end
+			else begin
+				romwctl_state <= 4'h1;
+				romwctl_wr <= 1'h1;
+				ioctl_wait <= 1'b1;
+			end
+			romwctl_addr <= ioctl_addr;
+			romwctl_data <= ioctl_data;
+			romwctl_download <= ioctl_download;
+			romwctl_index <= ioctl_index;
+		end
+		4'h1: begin
+			romwctl_state <= 4'h2;
+			romwctl_wr <= 1'h1;
+			ioctl_wait <= 1'b1;
+			romwctl_addr <= romwctl_addr + 'h1;
+			romwctl_data <= {8'h00, romwctl_data[15:8]};
+			romwctl_download <= romwctl_download;
+			romwctl_index <= romwctl_index;
+		end
+		4'h2: begin
+			if (~ioctl_wr)
+				romwctl_state <= 4'h0;
+			else
+				romwctl_state <= 4'h2;
+			romwctl_wr <= 1'h0;
+			ioctl_wait <= 1'b0;
+			romwctl_addr <= 'h0;
+			romwctl_data <= 'h0;
+			romwctl_download <= 'h0;
+			romwctl_index <= 'h0;
+		end
+		default: begin
+			romwctl_state <= 4'h0;
+			romwctl_wr <= 1'h0;
+			ioctl_wait <= 1'b0;
+			romwctl_addr <= 'h0;
+			romwctl_data <= 'h0;
+			romwctl_download <= 'h0;
+			romwctl_index <= 'h0;
+        end
+	endcase
+end
+
+//////////////////////////////////////////////////////////////////
+
+    reg [27:0] cur_rate;
+    always @(posedge CLK_50M) cur_rate <= 50000000;
+
 	wire [5:0] r, g, b;	
 	reg [7:0] raux, gaux, baux;	
 	
@@ -689,11 +779,11 @@ end
 		  .clk_en_opl2                        (cen_opl2), // clk_en_opl2
 		  .adlibhide                          (adlibhide),
 		  .tandy_video                        (tandy_mode),
-		  .ioctl_download                     (ioctl_download),
-		  .ioctl_index                        (ioctl_index),
-		  .ioctl_wr                           (ioctl_wr),
-		  .ioctl_addr                         (ioctl_addr),
-		  .ioctl_data                         (ioctl_data),		  
+		  .ioctl_download                     (romwctl_download),
+		  .ioctl_index                        (romwctl_index),
+		  .ioctl_wr                           (romwctl_wr),
+		  .ioctl_addr                         (romwctl_addr),
+		  .ioctl_data                         (romwctl_data[7:0]),		  
 		  .clk_uart                          (clk_uart),
 	     .uart_rx                           (uart_rx),
 	     .uart_tx                           (uart_tx),
@@ -718,6 +808,15 @@ end
         .sdram_udqm                         (SDRAM_DQMH),
 		  .ems_enabled                        (~status[11]),
 		  .ems_address                        (status[13:12]),
+        .mgmt_readdata                      (mgmt_din),
+        .mgmt_writedata                     (mgmt_dout),
+        .mgmt_address                       (mgmt_addr),
+        .mgmt_write                         (mgmt_wr),
+        .mgmt_read                          (mgmt_rd),
+		  .clock_rate                         (cur_rate),
+		  .floppy_wp                          (status[2:1]),
+		  .fdd_request                        (mgmt_req[7:6]),
+
         .tandy_mode                         (tandy_mode)
     );
 
