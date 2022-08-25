@@ -224,10 +224,9 @@ localparam CONF_STR = {
 	"P1-;",
 	"P1S0,IMGIMAVFD,Floppy A:;",
 	"P1S1,IMGIMAVFD,Floppy B:;",
-	"P1O12,Write Protect,None,A:,B:,A: & B:;",
+	"P1OQR,Write Protect,None,A:,B:,A: & B:;",
 	"P1-;",
 	"P1S2,IMG,HDD Image:;",
-	"P1-;",
 	"P1OLM,HDD Speed,115200,230400,460800,921600;",
 	"P1-;",
 	"P2,Audio & Video;",
@@ -814,7 +813,7 @@ end
         .mgmt_write                         (mgmt_wr),
         .mgmt_read                          (mgmt_rd),
 		  .clock_rate                         (cur_rate),
-		  .floppy_wp                          (status[2:1]),
+		  .floppy_wp                          (status[27:26]),
 		  .fdd_request                        (mgmt_req[7:6]),
 
         .tandy_mode                         (tandy_mode)
